@@ -1,4 +1,4 @@
-from random import random, randint
+from random import randint
 
 def coder(word):
     r1 = word[0]^word[1]^word[3]
