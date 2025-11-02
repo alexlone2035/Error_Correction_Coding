@@ -13,7 +13,7 @@ def modulator(word, sigma):
 
 def gaussian_noise(signal, sigma, mu=0):
     for i in range(len(signal)):
-        x = r.uniform(mu-0.2, mu+0.2)
+        x = r.uniform(0, mu+0.2)
         noise = (1 / (sigma * np.sqrt(2 * np.pi))) * np.exp(-((x - mu) ** 2) / (2 * (sigma ** 2)))
         signal[i] = signal[i] + noise
     return signal
