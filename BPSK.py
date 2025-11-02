@@ -1,24 +1,20 @@
 import random as r
 import numpy as np
-import math
 
-def modulator(word, sigma, mu=0):
+def modulator(word, sigma):
     signal = []
     for i in range(len(word)):
         if(word[i] == 0):
             signal.append(1)
         else:
             signal.append(-1)
-    signal = np.array(signal, dtype=int)
-    signal = gaussian_noise(signal, sigma, mu)
+    signal = np.array(signal, dtype=float)
     return signal
 
 def gaussian_noise(signal, sigma, mu=0):
-    print(type(signal), type(signal[0]), type(sigma), type(mu))
-
     for i in range(len(signal)):
-        x = r.uniform(-1, 1)  # заменяет r.random(-1,1)
-        noise = (1 / (sigma * math.sqrt(2 * math.pi))) * math.exp(-((x - mu) ** 2) / (2 * sigma ** 2))
+        x = r.uniform(mu-0.2, mu+0.2)
+        noise = (1 / (sigma * np.sqrt(2 * np.pi))) * np.exp(-((x - mu) ** 2) / (2 * (sigma ** 2)))
         signal[i] = signal[i] + noise
     return signal
 
@@ -46,8 +42,10 @@ def main():
     msg = np.array(int_msg, dtype=int)
     sigma = float(input("Введите значение сигма: "))
     signal = modulator(msg, sigma)
-    temp = signal.copy()
     print("Переданный сигнал: ",signal)
+    signal = gaussian_noise(signal, sigma)
+    print("Сигнал с шумом", signal)
+    temp = signal.copy()
     print("Результат жесткой демодуляции: ",hard_demodulator(temp))
     print("Результат мягкой демодуляции: ",soft_demodulator(signal, sigma))
 
