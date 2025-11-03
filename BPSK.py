@@ -1,21 +1,33 @@
 import random as r
 import numpy as np
 
-def modulator(word, sigma):
+def modulator(code, sigma):
     signal = []
-    for i in range(len(word)):
-        if(word[i] == 0):
+    for i in range(len(code)):
+        if(code[i] == 0):
             signal.append(1)
         else:
             signal.append(-1)
     signal = np.array(signal, dtype=float)
     return signal
 
-def gaussian_noise(signal, sigma, mu=0):
-    for i in range(len(signal)):
-        x = r.uniform(0, mu+0.2)
-        noise = (1 / (sigma * np.sqrt(2 * np.pi))) * np.exp(-((x - mu) ** 2) / (2 * (sigma ** 2)))
-        signal[i] = signal[i] + noise
+def gaussian_noise(signal, sigma):
+    i=0
+    size = len(signal)
+    while(i < size):
+        x1 = r.uniform(-1, 1)
+        x2 = r.uniform(-1, 1)
+        s = x1**2 + x2**2
+        while(s>1 or s<=0):
+            x1 = r.uniform(-1, 1)
+            x2 = r.uniform(-1, 1)
+            s = x1**2 + x2**2
+        z1 = x1*np.sqrt(-2*np.log(s)/s)
+        z2 = x2*np.sqrt(-2*np.log(s)/s)
+        signal[i] = signal[i] + sigma*z1
+        if(size > i+1):
+            signal[i+1] = signal[i+1] + sigma*z2
+        i+=2
     return signal
 
 
