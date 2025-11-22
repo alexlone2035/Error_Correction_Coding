@@ -2,16 +2,16 @@ import numpy as np
 from random import randint
 
 def error(code, n):
-    pos = randint(0, n)
-    pos1 = randint(0, n - 1)
-    if code[pos] == 1:
-        code[pos] = 0
-    elif code[pos] == 0:
-        code[pos] = 1
-    if code[pos1] == 0:
-        code[pos1] = 1
-    elif code[pos1] == 0:
-        code[pos1] = 1
+    pos = 1 #randint(0, n)
+    pos1 = 3 #randint(0, n - 1)
+    if code[0,pos] == 1:
+        code[0,pos] = 0
+    elif code[0,pos] == 0:
+        code[0,pos] = 1
+    if code[0,pos1] == 0:
+        code[0,pos1] = 1
+    elif code[0,pos1] == 1:
+        code[0,pos1] = 0
     return [pos, pos1]
 
 def get_r(k):
@@ -22,40 +22,22 @@ def get_r(k):
         r+=1
     return r
 
-def get_H(r,n):
-    H = []
-    for i in range(r):
-        row = []
-        for pos in range(1, n + 1):
-            if ((pos>>i)&1):
-                row.append(1)
-            else:
-                row.append(0)
-        H.append(row)
-    H = np.array(H, dtype=int)
-    cols = np.where(np.sum(H, axis=0) > 1)[0]
-    H = H[:, cols]
-    H = np.hstack([H, np.eye(r)])
-    return H
-
 def get_G(k, r):
     G = np.eye(k, dtype=int)
-    H = get_H(r,k+r)
-    R = H[:, :k]
-    G = np.hstack([G,R.T])
-
+    R = np.ones((k, k), dtype=int)
+    i = k - 1
+    j = 0
+    while (i >= 0):
+        R[i, j] -= 1
+        i -= 1
+        j += 1
+    G = np.hstack([G,R])
     return G
 
 def coder(msg, r, k):
     G = get_G(k, r)
     msg = msg.reshape(1,k)
     code = np.matmul(msg, G) % 2
-    sum=0
-    for j in range(r+k):
-        sum += code.item(j)
-    sum = sum % 2
-    code = np.append(code, sum)
-
     return code
 
 def get_C(k,n,r):
@@ -75,11 +57,6 @@ def get_C(k,n,r):
         temp = TT[i]
         temp.reshape(1,k)
         code = np.matmul(TT[i], G) % 2
-        sum = 0
-        for j in range(n-1):
-            sum += code[j]
-        sum = sum%2
-        code = np.append(code, sum)
         C.append(code)
     C = np.array(C, dtype=int)
     return C
