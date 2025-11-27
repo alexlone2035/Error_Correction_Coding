@@ -69,11 +69,11 @@ def gen_word(k):
 def main():
     size = 0
     with open('dataset.txt', 'w') as f:
-        for k in range(149, 150):
+        for k in range(4, 20):
             r = get_r(k)
             G = get_G(k, r)
             sigma = 1
-            for i in range(2000):
+            for i in range(300):
                 word = gen_word(k)
                 for j in range(len(word)):
                     f.write(str(word[j]))
@@ -86,6 +86,6 @@ def main():
                     f.write(str(signal[j])+' ')
                 f.write('\n')
                 size += 1
-                sigma += 0.2
+                sigma += 0.02
 
 main()

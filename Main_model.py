@@ -2,21 +2,42 @@ import numpy as np
 import torch
 from torch import nn
 
-epochs = 50
+epochs = 150
 batch = 128
+L_mid = 128
 
 class DecoderModel(nn.Module):
     def __init__(self, L_in, L_out):
         super().__init__()
         self.layers = nn.Sequential(
-            nn.Linear(L_in, 128),
+            nn.Linear(L_in, L_mid),
             nn.ReLU(),
-            nn.Linear(128, 128),
+            nn.Linear(L_mid, L_mid),
             nn.ReLU(),
-            nn.Linear(128, L_out),
+            nn.Linear(L_mid, L_out),
         )
     def forward(self, x):
         return self.layers(x)
+
+def padding(noisy_vectors, words):
+    max_word = max(len(word) for word in words)
+    max_vector = max(len(vector) for vector in noisy_vectors)
+    padded_words = []
+    padded_vectors = []
+    for word in words:
+        if len(word) < max_word:
+            pad_word = [0]*(max_word-len(word))+word
+        else:
+            pad_word = word
+        padded_words.append(pad_word)
+    for vector in noisy_vectors:
+        if len(vector) < max_vector:
+            pad_vector = [0]*(max_vector-len(vector)) + vector
+        else:
+            pad_vector = vector
+        padded_vectors.append(pad_vector)
+    return padded_words, padded_vectors, max_vector, max_word
+
 
 def load_dataset(path):
     words = []
@@ -26,14 +47,13 @@ def load_dataset(path):
             parts = line.strip().split()
             word = parts[0]
             nums = list(map(float, parts[1:]))
-            target_vec = np.array([int(c) for c in word], dtype=np.float32)
-            noisy_vec = np.array(nums, dtype=np.float32)
+            target_vec = list(int(c) for c in word)
+            noisy_vec = list(int(c) for c in nums)
             words.append(target_vec)
             noisy_vectors.append(noisy_vec)
-    L_in = len(noisy_vectors[0])
-    L_out = len(words[0])
-    noisy_tensor = torch.tensor(np.array(noisy_vectors), dtype=torch.float32)
-    target_tensor = torch.tensor(np.array(words), dtype=torch.float32)
+    padded_words, padded_vectors, L_in, L_out = padding(noisy_vectors, words)
+    noisy_tensor = torch.tensor(padded_vectors, dtype=torch.float32)
+    target_tensor = torch.tensor(padded_words, dtype=torch.int)
     return noisy_tensor, target_tensor, L_in, L_out
 
 def get_data_loaders(noisy_tensor, target_tensor):
