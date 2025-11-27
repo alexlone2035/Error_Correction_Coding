@@ -69,19 +69,17 @@ def work_with_model(model, train_loader, val_loader, test_loader, n_train, n_val
             test_loss += loss.item() * inputs.size(0)
     print("\nMSE на тесте:", test_loss / n_test)
 
+
 def vis(model):
-    x_grid = np.linspace(-10, 10, 200)
-    y_grid = np.linspace(-10, 10, 200)
-    Xg, Yg = np.meshgrid(x_grid, y_grid)
-    true_val = np.sin(Xg + 2 * Yg) * np.exp(-(2 * Xg + Yg) ** 2)
+    line = torch.linspace(-10, 10, 200)
     with torch.no_grad():
-        inputs = torch.tensor(np.vstack([Xg.ravel(), Yg.ravel()]).T, dtype=torch.float32)
-        pred_val = model(inputs).numpy().reshape(Xg.shape)
-    fig, ax = plt.subplots(1, 2, figsize=(12, 5))
-    ax[0].imshow(true_val, extent=[-10, 10, -10, 10], origin='lower')
-    ax[0].set_title("Функция")
-    ax[1].imshow(pred_val, extent=[-10, 10, -10, 10], origin='lower')
-    ax[1].set_title("Модель")
+        true_line = np.sin(line.numpy() + 2 * line.numpy()) * np.exp(-(2 * line.numpy() + line.numpy()) ** 2)
+        pred_line = model(torch.stack([line, line], dim=1)).numpy().flatten()
+    plt.figure(figsize=(10, 6))
+    plt.plot(line.numpy(), true_line, label='Исходная функция', linewidth=2)
+    plt.plot(line.numpy(), pred_line, label='Модель', linewidth=2)
+    plt.grid(True)
+    plt.legend()
     plt.show()
 
 def main():
