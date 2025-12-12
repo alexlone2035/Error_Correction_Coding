@@ -14,6 +14,10 @@ class DecoderModel(nn.Module):
             nn.ReLU(),
             nn.Linear(L_mid, L_mid),
             nn.ReLU(),
+            nn.Linear(L_mid, L_mid),
+            nn.ReLU(),
+            nn.Linear(L_mid, L_mid),
+            nn.ReLU(),
             nn.Linear(L_mid, L_out),
         )
     def forward(self, x):
@@ -48,7 +52,7 @@ def load_dataset(path):
             word = parts[0]
             nums = list(map(float, parts[1:]))
             target_vec = list(int(c) for c in word)
-            noisy_vec = list(int(c) for c in nums)
+            noisy_vec = nums
             words.append(target_vec)
             noisy_vectors.append(noisy_vec)
     padded_words, padded_vectors, L_in, L_out = padding(noisy_vectors, words)
