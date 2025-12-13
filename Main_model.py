@@ -23,29 +23,56 @@ class DecoderModel(nn.Module):
     def forward(self, x):
         return self.layers(x)
 
-def padding(noisy_vectors, words):
-    max_word = max(len(word) for word in words)
-    max_vector = max(len(vector) for vector in noisy_vectors)
-    padded_words = []
-    padded_vectors = []
-    for word in words:
+def padding(train_noisy_vectors, train_words, test_noisy_vectors, test_words):
+    max_word = max(len(word) for word in train_words)
+    max_word  = max(len(word) for word in test_words)
+    max_vector = max(len(vector) for vector in train_noisy_vectors)
+    max_vector = max(len(vector) for vector in test_noisy_vectors)
+    padded_train_words = []
+    padded_train_vectors = []
+    padded_test_words = []
+    padded_test_vectors = []
+    for word in train_words:
         if len(word) < max_word:
             pad_word = [0]*(max_word-len(word))+word
         else:
             pad_word = word
-        padded_words.append(pad_word)
-    for vector in noisy_vectors:
+        padded_train_words.append(pad_word)
+    for word in test_words:
+        if len(word) < max_vector:
+            pad_word = [0]*(max_word-len(word))+word
+        else:
+            pad_word = word
+        padded_test_words.append(pad_word)
+    for vector in train_noisy_vectors:
         if len(vector) < max_vector:
             pad_vector = [0]*(max_vector-len(vector)) + vector
         else:
             pad_vector = vector
-        padded_vectors.append(pad_vector)
-    return padded_words, padded_vectors, max_vector, max_word
+        padded_train_vectors.append(pad_vector)
+    for vector in test_noisy_vectors:
+        if len(vector) < max_vector:
+            pad_vector = [0]*(max_vector-len(vector)) + vector
+        else:
+            pad_vector = vector
+        padded_test_vectors.append(pad_vector)
+    return padded_train_words, padded_train_vectors, padded_test_words, padded_test_vectors, max_vector, max_word
 
 
-def load_dataset(path):
-    words = []
-    noisy_vectors = []
+def load_dataset(train_path, path):
+    train_words = []
+    train_noisy_vectors = []
+    test_words = []
+    test_noisy_vectors = []
+    with open(train_path, "r") as f:
+        for line in f:
+            parts = line.strip().split()
+            word = parts[0]
+            nums = list(map(float, parts[1:]))
+            target_vec = list(int(c) for c in word)
+            noisy_vec = nums
+            train_words.append(target_vec)
+            train_noisy_vectors.append(noisy_vec)
     with open(path, "r") as f:
         for line in f:
             parts = line.strip().split()
@@ -53,20 +80,23 @@ def load_dataset(path):
             nums = list(map(float, parts[1:]))
             target_vec = list(int(c) for c in word)
             noisy_vec = nums
-            words.append(target_vec)
-            noisy_vectors.append(noisy_vec)
-    padded_words, padded_vectors, L_in, L_out = padding(noisy_vectors, words)
-    noisy_tensor = torch.tensor(padded_vectors, dtype=torch.float32)
-    target_tensor = torch.tensor(padded_words, dtype=torch.int)
-    return noisy_tensor, target_tensor, L_in, L_out
+            test_words.append(target_vec)
+            test_noisy_vectors.append(noisy_vec)
+    padded_train_words, padded_train_vectors, padded_test_words, padded_test_vectors, L_in, L_out = padding(train_noisy_vectors, train_words, test_noisy_vectors, test_words)
+    noisy_train_tensor = torch.tensor(padded_train_vectors, dtype=torch.float32)
+    target_train_tensor = torch.tensor(padded_train_words, dtype=torch.int)
+    noisy_test_tensor = torch.tensor(padded_test_vectors, dtype=torch.float32)
+    target_test_tensor = torch.tensor(padded_test_words, dtype=torch.int)
+    return noisy_train_tensor, target_train_tensor, noisy_test_tensor, target_test_tensor, L_in, L_out
 
-def get_data_loaders(noisy_tensor, target_tensor):
-    N = len(noisy_tensor)
-    dataset = torch.utils.data.TensorDataset(noisy_tensor, target_tensor)
-    n_train = int(N * 0.7)
-    n_val = int(N * 0.10)
-    n_test = N - n_train - n_val
-    train_set, val_set, test_set = torch.utils.data.random_split(dataset, [n_train, n_val, n_test])
+def get_data_loaders( noisy_train_tensor, target_train_tensor, noisy_test_tensor, target_test_tensor):
+    n_train = len(noisy_train_tensor)
+    train_set = torch.utils.data.TensorDataset(noisy_train_tensor, target_train_tensor)
+    N = len(noisy_test_tensor)
+    n_test = int(N * 0.7)
+    n_val = N - n_test
+    test_dataset = torch.utils.data.TensorDataset(noisy_test_tensor, target_test_tensor)
+    val_set, test_set = torch.utils.data.random_split(test_dataset, [n_val, n_test])
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch, shuffle=True)
     val_loader = torch.utils.data.DataLoader(val_set, batch_size=batch)
     test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch)
@@ -102,9 +132,9 @@ def work_with_model(model, train_loader, val_loader, test_loader, n_train, n_val
     print("\nL1 на тесте:", test_loss / n_test)
 
 def main():
-    noisy_tensor, target_tensor, L_in, L_out = load_dataset("dataset.txt")
+    noisy_train_tensor, target_train_tensor, noisy_test_tensor, target_test_tensor, L_in, L_out = load_dataset("trainset.txt", "testset.txt")
     model = DecoderModel(L_in, L_out)
-    train_loader, val_loader, test_loader, n_train, n_val, n_test = get_data_loaders(noisy_tensor, target_tensor)
+    train_loader, val_loader, test_loader, n_train, n_val, n_test = get_data_loaders( noisy_train_tensor, target_train_tensor, noisy_test_tensor, target_test_tensor)
     work_with_model(model, train_loader, val_loader, test_loader, n_train, n_val, n_test)
 
 main()

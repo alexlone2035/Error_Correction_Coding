@@ -67,13 +67,22 @@ def gen_word(k):
     return word
 
 def main():
+    min_size = 20
+    max_size = 25
+    range_size = 3000
+    min_train_sigma = 0.5
+    max_train_sigma = 3
+    min_test_sigma = 0.5
+    max_test_sigma = 3
+    test_range_size = range_size * 0.3
+    train_range_size = range_size * 0.7
     size = 0
-    with open('dataset.txt', 'w') as f:
-        for k in range(10, 11):
+    with open('trainset.txt', 'w') as f:
+        for k in range(min_size, max_size+1):
             r = get_r(k)
             G = get_G(k, r)
-            sigma = 1
-            for i in range(3000):
+            sigma = min_train_sigma
+            for i in range(int(train_range_size)):
                 word = gen_word(k)
                 for j in range(len(word)):
                     f.write(str(word[j]))
@@ -86,6 +95,28 @@ def main():
                     f.write(str(signal[j])+' ')
                 f.write('\n')
                 size += 1
-                sigma += 0.02
-
+                sigma += 0.01
+                if sigma > max_train_sigma:
+                    sigma = min_train_sigma
+    with open('testset.txt', 'w') as f:
+        for k in range(min_size, max_size + 1):
+            r = get_r(k)
+            G = get_G(k, r)
+            sigma = min_test_sigma
+            for i in range(int(test_range_size)):
+                word = gen_word(k)
+                for j in range(len(word)):
+                    f.write(str(word[j]))
+                f.write(' ')
+                word = np.array(word, dtype=int)
+                code = coder(word, k, G)
+                signal = modulator(code)
+                signal = gaussian_noise(signal, sigma)
+                for j in range(len(signal)):
+                    f.write(str(signal[j]) + ' ')
+                f.write('\n')
+                size += 1
+                sigma += 0.01
+                if sigma > max_test_sigma:
+                    sigma = min_test_sigma
 main()
