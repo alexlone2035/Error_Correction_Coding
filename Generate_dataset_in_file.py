@@ -38,26 +38,38 @@ def modulator(code):
     return signal
 
 def gaussian_noise(signal, sigma):
-    i = r.randint(0, len(signal)-1)
-    check = signal[i]
-    x1 = r.uniform(-1, 1)
-    x2 = r.uniform(-1, 1)
-    s = x1 ** 2 + x2 ** 2
-    while (s > 1 or s <= 0):
+    errors = 0
+    i=0
+    while i < len(signal):
+        check = signal[i]
+        check1 = signal[i+1]
         x1 = r.uniform(-1, 1)
         x2 = r.uniform(-1, 1)
         s = x1 ** 2 + x2 ** 2
-    z1 = x1 * np.sqrt(-2 * np.log(s) / s)
-    z2 = x2 * np.sqrt(-2 * np.log(s) / s)
-    signal[i] = signal[i] + sigma * z1
-    if(check == 1):
-        if(signal[i] > 0):
-            signal[i] = 1
-            signal = gaussian_noise(signal, sigma)
-    if (check == -1):
-        if (signal[i] < 0):
-            signal[i] = -1
-            signal = gaussian_noise(signal, sigma)
+        while (s > 1 or s <= 0):
+            x1 = r.uniform(-1, 1)
+            x2 = r.uniform(-1, 1)
+            s = x1 ** 2 + x2 ** 2
+        z1 = x1 * np.sqrt(-2 * np.log(s) / s)
+        z2 = x2 * np.sqrt(-2 * np.log(s) / s)
+        signal[i] = signal[i] + sigma * z1
+        if (i+1 <= len(signal)):
+            signal[i+1] = signal[i+1] + sigma * z2
+        if(check == 1):
+            if(signal[i] < 0):
+                errors += 1
+        if (check == -1):
+            if (signal[i] > 0):
+                errors += 1
+        if (check1 == 1):
+            if (signal[i] < 0):
+                errors += 1
+        if (check1 == -1):
+            if (signal[i] > 0):
+                errors += 1
+        i += 2
+    if(errors > 1):
+        signal[0] = 999
     return signal
 
 def gen_word(k):
@@ -67,13 +79,13 @@ def gen_word(k):
     return word
 
 def main():
-    min_size = 20
-    max_size = 25
-    range_size = 3000
+    min_size = 5
+    max_size = 5
+    range_size = 36000
     min_train_sigma = 0.5
-    max_train_sigma = 3
+    max_train_sigma = 0.5
     min_test_sigma = 0.5
-    max_test_sigma = 3
+    max_test_sigma = 0.5
     test_range_size = range_size * 0.3
     train_range_size = range_size * 0.7
     size = 0
@@ -84,13 +96,15 @@ def main():
             sigma = min_train_sigma
             for i in range(int(train_range_size)):
                 word = gen_word(k)
-                for j in range(len(word)):
-                    f.write(str(word[j]))
-                f.write(' ')
                 word = np.array(word, dtype=int)
                 code = coder(word, k, G)
                 signal = modulator(code)
                 signal = gaussian_noise(signal, sigma)
+                if (signal[0] == 999):
+                    continue
+                for j in range(len(word)):
+                    f.write(str(word[j]))
+                f.write(' ')
                 for j in range(len(signal)):
                     f.write(str(signal[j])+' ')
                 f.write('\n')
@@ -105,13 +119,15 @@ def main():
             sigma = min_test_sigma
             for i in range(int(test_range_size)):
                 word = gen_word(k)
-                for j in range(len(word)):
-                    f.write(str(word[j]))
-                f.write(' ')
                 word = np.array(word, dtype=int)
                 code = coder(word, k, G)
                 signal = modulator(code)
                 signal = gaussian_noise(signal, sigma)
+                if (signal[0] == 999):
+                    continue
+                for j in range(len(word)):
+                    f.write(str(word[j]))
+                f.write(' ')
                 for j in range(len(signal)):
                     f.write(str(signal[j]) + ' ')
                 f.write('\n')

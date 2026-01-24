@@ -1,10 +1,19 @@
 import torch
 from torch import nn
+import random
+import numpy as np
 device = torch.device('cuda')
 
 epochs = 150
 batch = 128
 L_mid = 128
+
+def init_seed(seed=42):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
 
 class DecoderModel(nn.Module):
     def __init__(self, L_in, L_out):
@@ -57,7 +66,21 @@ def padding(train_noisy_vectors, train_words, test_noisy_vectors, test_words):
         else:
             pad_vector = vector
         padded_test_vectors.append(pad_vector)
-    return padded_train_words, padded_train_vectors, padded_test_words, padded_test_vectors, max_vector, max_word
+    return padded_train_words, padded_train_vectors, padded_test_words, padded_test_vectors
+
+def normalization(padded_train_words, padded_train_vectors, padded_test_words, padded_test_vectors):
+    X_train = np.array(padded_train_vectors, dtype=np.float32)
+    Y_train = np.array(padded_train_words, dtype=np.float32)
+    X_test = np.array(padded_test_vectors, dtype=np.float32)
+    Y_test = np.array(padded_test_words, dtype=np.float32)
+    mean = X_train.mean()
+    std = X_train.std()
+    if std == 0: std = 1.0
+    X_train = (X_train - mean) / std
+    X_test = (X_test - mean) / std
+    L_in = X_train.shape[1]
+    L_out = Y_train.shape[1]
+    return torch.tensor(X_train), torch.tensor(Y_train), torch.tensor(X_test), torch.tensor(Y_test), L_in, L_out
 
 def load_dataset(train_path, path):
     train_words = []
@@ -82,13 +105,8 @@ def load_dataset(train_path, path):
             noisy_vec = nums
             test_words.append(target_vec)
             test_noisy_vectors.append(noisy_vec)
-    padded_train_words, padded_train_vectors, padded_test_words, padded_test_vectors, L_in, L_out = padding(
-        train_noisy_vectors, train_words, test_noisy_vectors, test_words)
-    noisy_train_tensor = torch.tensor(padded_train_vectors, dtype=torch.float32)
-    target_train_tensor = torch.tensor(padded_train_words, dtype=torch.float32)
-    noisy_test_tensor = torch.tensor(padded_test_vectors, dtype=torch.float32)
-    target_test_tensor = torch.tensor(padded_test_words, dtype=torch.float32)
-    return noisy_train_tensor, target_train_tensor, noisy_test_tensor, target_test_tensor, L_in, L_out
+    padded_train_words, padded_train_vectors, padded_test_words, padded_test_vectors = padding(train_noisy_vectors, train_words, test_noisy_vectors, test_words)
+    return normalization(padded_train_words, padded_train_vectors, padded_test_words, padded_test_vectors)
 
 def get_data_loaders(noisy_train_tensor, target_train_tensor, noisy_test_tensor, target_test_tensor):
     n_train = len(noisy_train_tensor)
@@ -105,7 +123,7 @@ def get_data_loaders(noisy_train_tensor, target_train_tensor, noisy_test_tensor,
 
 def work_with_model(model, train_loader, val_loader, test_loader, n_train, n_val, n_test):
     model = model.to(device)
-    criterion = nn.L1Loss()
+    criterion = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     for epoch in range(epochs):
         model.train()
@@ -137,9 +155,10 @@ def work_with_model(model, train_loader, val_loader, test_loader, n_train, n_val
             out = model(noisy)
             loss = criterion(out, target)
             test_loss += loss.item() * noisy.size(0)
-    print("\nL1 на тесте:", test_loss / n_test)
+    print("\nBCEWithLogitsLoss на тесте:", test_loss / n_test)
 
 def main():
+    init_seed(42)
     noisy_train_tensor, target_train_tensor, noisy_test_tensor, target_test_tensor, L_in, L_out = load_dataset("trainset.txt", "testset.txt")
     model = DecoderModel(L_in, L_out)
     train_loader, val_loader, test_loader, n_train, n_val, n_test = get_data_loaders(noisy_train_tensor, target_train_tensor, noisy_test_tensor, target_test_tensor)
