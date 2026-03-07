@@ -1,6 +1,9 @@
 import numpy as np
 import random as r
 
+from Hamming_Codec import error
+
+
 def get_r(k):
     r=1;
     while True:
@@ -37,40 +40,32 @@ def modulator(code):
     signal = np.array(signal, dtype=float)
     return signal
 
+
 def gaussian_noise(signal, sigma):
-    errors = 0
-    i=0
-    while i < len(signal):
-        check = signal[i]
-        check1 = signal[i+1]
-        x1 = r.uniform(-1, 1)
-        x2 = r.uniform(-1, 1)
-        s = x1 ** 2 + x2 ** 2
-        while (s > 1 or s <= 0):
-            x1 = r.uniform(-1, 1)
-            x2 = r.uniform(-1, 1)
-            s = x1 ** 2 + x2 ** 2
-        z1 = x1 * np.sqrt(-2 * np.log(s) / s)
-        z2 = x2 * np.sqrt(-2 * np.log(s) / s)
-        signal[i] = signal[i] + sigma * z1
-        if (i+1 <= len(signal)):
-            signal[i+1] = signal[i+1] + sigma * z2
-        if(check == 1):
-            if(signal[i] < 0):
-                errors += 1
-        if (check == -1):
-            if (signal[i] > 0):
-                errors += 1
-        if (check1 == 1):
-            if (signal[i] < 0):
-                errors += 1
-        if (check1 == -1):
-            if (signal[i] > 0):
-                errors += 1
-        i += 2
-    if(errors > 1):
-        signal[0] = 999
-    return signal
+    noisy_signal = []
+    p = 3 / len(signal)
+    state = 1
+    error = 1
+    for bit in signal:
+        cur_sigma = sigma
+        rand_num = np.random.random()
+        if state == 1:
+            if rand_num < p:
+                state = 2
+        noise = np.random.normal(0, cur_sigma)
+        noisy_bit = bit + noise
+        if state == 2:
+            noise = np.random.normal(2, cur_sigma)
+            noisy_bit = bit + noise
+            if (bit * noisy_bit > 0):
+                noisy_bit = bit - noise
+                if (bit * noisy_bit > 0):
+                    error = 0
+            state = 3
+        noisy_signal.append(noisy_bit)
+    if(error == 0):
+        noisy_signal[0] = 999
+    return noisy_signal
 
 def gen_word(k):
     word = []
@@ -79,13 +74,14 @@ def gen_word(k):
     return word
 
 def main():
+    p = 1
     min_size = 5
     max_size = 5
     range_size = 36000
-    min_train_sigma = 0.5
-    max_train_sigma = 0.5
-    min_test_sigma = 0.5
-    max_test_sigma = 0.5
+    min_train_sigma = 0.1
+    max_train_sigma = 0.1
+    min_test_sigma = 0.1
+    max_test_sigma = 0.1
     test_range_size = range_size * 0.3
     train_range_size = range_size * 0.7
     size = 0
@@ -100,7 +96,7 @@ def main():
                 code = coder(word, k, G)
                 signal = modulator(code)
                 signal = gaussian_noise(signal, sigma)
-                if (signal[0] == 999):
+                if(signal[0]==999):
                     continue
                 for j in range(len(word)):
                     f.write(str(word[j]))
@@ -123,8 +119,6 @@ def main():
                 code = coder(word, k, G)
                 signal = modulator(code)
                 signal = gaussian_noise(signal, sigma)
-                if (signal[0] == 999):
-                    continue
                 for j in range(len(word)):
                     f.write(str(word[j]))
                 f.write(' ')
