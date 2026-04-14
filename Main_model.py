@@ -2,6 +2,7 @@ import torch
 from torch import nn
 import random
 import numpy as np
+
 device = torch.device('cuda')
 
 epochs = 150
@@ -29,9 +30,91 @@ class DecoderModel(nn.Module):
             nn.ReLU(),
             nn.Linear(L_mid, L_out),
         )
+        self.data_mean = 0.0
+        self.data_std = 1.0
 
     def forward(self, x):
         return self.layers(x)
+
+    @classmethod
+    def train_model(cls, train_path, test_path, save_path="checkpoint.pth"):
+
+        noisy_train_tensor, target_train_tensor, noisy_test_tensor, target_test_tensor, L_in, L_out, mean, std = load_dataset(train_path, test_path)
+        train_loader, val_loader, test_loader, n_train, n_val, n_test = get_data_loaders(noisy_train_tensor, target_train_tensor, noisy_test_tensor, target_test_tensor)
+
+        model = cls(L_in, L_out).to(device)
+
+        model.data_mean = mean
+        model.data_std = std
+
+        criterion = nn.BCEWithLogitsLoss()
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+
+        for epoch in range(epochs):
+            model.train()
+            train_loss = 0.0
+            for noisy, target in train_loader:
+                noisy = noisy.to(device)
+                target = target.to(device)
+                optimizer.zero_grad()
+                out = model(noisy)
+                loss = criterion(out, target)
+                loss.backward()
+                optimizer.step()
+                train_loss += loss.item() * noisy.size(0)
+            model.eval()
+            val_loss = 0.0
+            with torch.no_grad():
+                for noisy, target in val_loader:
+                    noisy = noisy.to(device)
+                    target = target.to(device)
+                    out = model(noisy)
+                    loss = criterion(out, target)
+                    val_loss += loss.item() * noisy.size(0)
+            print("Epoch ", epoch + 1, ": Train_loss: ", train_loss / n_train, "Val_loss: ", val_loss / n_val)
+
+        test_loss = 0.0
+        with torch.no_grad():
+            for noisy, target in test_loader:
+                noisy = noisy.to(device)
+                target = target.to(device)
+                out = model(noisy)
+                loss = criterion(out, target)
+                test_loss += loss.item() * noisy.size(0)
+        print("\nBCEWithLogitsLoss на тесте:", test_loss / n_test)
+
+        checkpoint = {
+            'L_in': L_in,
+            'L_out': L_out,
+            'mean': mean,
+            'std': std,
+            'state_dict': model.state_dict()
+        }
+        torch.save(checkpoint, save_path)
+        print(f"Checkpoint сохранен: {save_path}")
+
+        return model
+
+    @classmethod
+    def load_from_checkpoint(cls, load_path="checkpoint.pth"):
+        checkpoint = torch.load(load_path, map_location=device)
+        model = cls(checkpoint['L_in'], checkpoint['L_out'])
+        model.load_state_dict(checkpoint['state_dict'])
+        model.data_mean = checkpoint['mean']
+        model.data_std = checkpoint['std']
+        model.to(device)
+        model.eval()
+        return model
+
+    def predict(self, x):
+        self.eval()
+        with torch.no_grad():
+            if not isinstance(x, torch.Tensor):
+                x = torch.tensor(x, dtype=torch.float32)
+            x = (x - self.data_mean) / self.data_std
+            x = x.to(device)
+            prediction = self(x)
+        return prediction
 
 def padding(train_noisy_vectors, train_words, test_noisy_vectors, test_words):
     max_word = max(len(word) for word in train_words)
@@ -80,7 +163,7 @@ def normalization(padded_train_words, padded_train_vectors, padded_test_words, p
     X_test = (X_test - mean) / std
     L_in = X_train.shape[1]
     L_out = Y_train.shape[1]
-    return torch.tensor(X_train), torch.tensor(Y_train), torch.tensor(X_test), torch.tensor(Y_test), L_in, L_out
+    return torch.tensor(X_train), torch.tensor(Y_train), torch.tensor(X_test), torch.tensor(Y_test), L_in, L_out, mean, std
 
 def load_dataset(train_path, path):
     train_words = []
@@ -121,47 +204,9 @@ def get_data_loaders(noisy_train_tensor, target_train_tensor, noisy_test_tensor,
     test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch, pin_memory=True)
     return train_loader, val_loader, test_loader, n_train, n_val, n_test
 
-def work_with_model(model, train_loader, val_loader, test_loader, n_train, n_val, n_test):
-    model = model.to(device)
-    criterion = nn.BCEWithLogitsLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-    for epoch in range(epochs):
-        model.train()
-        train_loss = 0.0
-        for noisy, target in train_loader:
-            noisy = noisy.to(device)
-            target = target.to(device)
-            optimizer.zero_grad()
-            out = model(noisy)
-            loss = criterion(out, target)
-            loss.backward()
-            optimizer.step()
-            train_loss += loss.item() * noisy.size(0)
-        model.eval()
-        val_loss = 0.0
-        with torch.no_grad():
-            for noisy, target in val_loader:
-                noisy = noisy.to(device)
-                target = target.to(device)
-                out = model(noisy)
-                loss = criterion(out, target)
-                val_loss += loss.item() * noisy.size(0)
-        print("Epoch ", epoch + 1, ": Train_loss: ", train_loss / n_train, "Val_loss: ", val_loss / n_val)
-    test_loss = 0.0
-    with torch.no_grad():
-        for noisy, target in test_loader:
-            noisy = noisy.to(device)
-            target = target.to(device)
-            out = model(noisy)
-            loss = criterion(out, target)
-            test_loss += loss.item() * noisy.size(0)
-    print("\nBCEWithLogitsLoss на тесте:", test_loss / n_test)
 
 def main():
     init_seed(42)
-    noisy_train_tensor, target_train_tensor, noisy_test_tensor, target_test_tensor, L_in, L_out = load_dataset("trainset.txt", "testset.txt")
-    model = DecoderModel(L_in, L_out)
-    train_loader, val_loader, test_loader, n_train, n_val, n_test = get_data_loaders(noisy_train_tensor, target_train_tensor, noisy_test_tensor, target_test_tensor)
-    work_with_model(model, train_loader, val_loader, test_loader, n_train, n_val, n_test)
+    model = DecoderModel.train_model("trainset.txt", "testset.txt")
 
 main()

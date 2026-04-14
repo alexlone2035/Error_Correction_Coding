@@ -39,4 +39,3 @@ def main():
     word = decoder(code)
     print('Декодированное слово:', word)
 
-main()
